@@ -12,8 +12,8 @@ configured time (15 minutes by default). Press Esc to quit.
 
 Only one instance runs at a time, and while running it keeps a minimized window
 so the taskbar shows a running indicator. Launching ScreenCover again (from the
-taskbar or the global shortcut), or clicking its taskbar icon, re-covers the
-screens on the running instance instead of opening a duplicate.
+global shortcut or the menu) re-covers the screens on the running instance
+instead of opening a duplicate.
 """
 
 from __future__ import annotations
@@ -194,9 +194,9 @@ class ScreenCover:
     IPC_POLL_MS = 250
 
     # Minimize once the pointer moves more than this many pixels from where it
-    # sat when the cover armed. A threshold (rather than any motion) keeps a
-    # tiny jitter or the residual movement from launching from dismissing it.
-    MOTION_THRESHOLD_PX = 30
+    # was when the first motion after arming arrived. A small threshold (rather
+    # than any motion) keeps tiny jitter from dismissing the cover.
+    MOTION_THRESHOLD_PX = 10
 
     def __init__(self, idle_timeout_ms=15 * 60 * 1000, ipc_sock=None):
         self.idle_timeout_ms = idle_timeout_ms
@@ -212,14 +212,14 @@ class ScreenCover:
         # Toplevels and are unaffected by the root staying iconified.
         self.root = tk.Tk(className="ScreenCover")
         self.root.title("ScreenCover")
-        self.root.bind("<Map>", self._on_root_activated)
         self.root.iconify()
 
         self.armed = False
         self.covered = True
         self.idle_unavailable = False  # True once we've given up on idle polls.
-        # Pointer position captured when the cover arms; motion past the
-        # threshold from here minimizes. ``None`` until the first arm.
+        # Baseline pointer position, set from the first motion event after the
+        # cover arms; motion past the threshold from here minimizes. Reset to
+        # ``None`` on every arm.
         self._pointer_anchor = None
         self.windows = []
         for x, y, width, height in get_monitors():
@@ -256,24 +256,19 @@ class ScreenCover:
         self.minimize()
 
     def _on_motion(self, event):
-        if not self.armed or self._pointer_anchor is None:
+        if not self.armed:
+            return
+        # Anchor on the first motion event after arming so the baseline and the
+        # comparison use the same coordinate source (event root coordinates),
+        # then minimize once the pointer leaves the threshold box around it.
+        if self._pointer_anchor is None:
+            self._pointer_anchor = (event.x_root, event.y_root)
             return
         ax, ay = self._pointer_anchor
         if abs(event.x_root - ax) >= self.MOTION_THRESHOLD_PX or abs(
             event.y_root - ay
         ) >= self.MOTION_THRESHOLD_PX:
             self.minimize()
-
-    def _on_root_activated(self, event=None):
-        # Clicking the taskbar icon un-minimizes (maps) the tracker root window.
-        # Treat it as "cover now" and snap the root back to minimized so the
-        # empty window never actually shows. Re-minimizing emits only <Unmap>,
-        # so there is no feedback loop.
-        if event is not None and event.widget is not self.root:
-            return  # Ignore Map events bubbling up from child widgets.
-        if not self.covered:
-            self.cover()
-        self.root.iconify()
 
     def minimize(self):
         """Hide every cover so the desktop is usable; poll for idle to return."""
@@ -371,12 +366,10 @@ class ScreenCover:
             pass
 
     def _arm(self):
-        # Anchor the pointer here so _on_motion measures movement from the
-        # moment the cover became dismissable, not from launch.
-        try:
-            self._pointer_anchor = self.root.winfo_pointerxy()
-        except tk.TclError:
-            self._pointer_anchor = None
+        # Reset the motion baseline; _on_motion re-establishes it from the first
+        # motion event after arming, so movement is measured from the moment the
+        # cover became dismissable rather than from launch.
+        self._pointer_anchor = None
         self.armed = True
 
 
