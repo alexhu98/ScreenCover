@@ -205,8 +205,11 @@ class ScreenCover:
         # Keep the root window WM-managed but minimized (rather than withdrawn)
         # so the taskbar shows a running indicator while ScreenCover is alive.
         # The class name sets WM_CLASS, which the shell matches against the
-        # launcher's StartupWMClass. The covers are override-redirect Toplevels
-        # and are unaffected by the root staying iconified.
+        # launcher's StartupWMClass. Note Tk normalizes the class name (it
+        # lowercases it and capitalizes the first letter), so "ScreenCover"
+        # becomes the WM_CLASS class "Screencover" -- that is what the desktop
+        # file's StartupWMClass must equal. The covers are override-redirect
+        # Toplevels and are unaffected by the root staying iconified.
         self.root = tk.Tk(className="ScreenCover")
         self.root.title("ScreenCover")
         self.root.bind("<Map>", self._on_root_activated)
