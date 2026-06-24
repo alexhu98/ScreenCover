@@ -5,6 +5,7 @@ Comment=Cover all screens with a black canvas; any key minimizes, returns when i
 Exec=__RUN__
 Icon=__ICON_PATH__
 Terminal=false
+StartupWMClass=ScreenCover
 Categories=Utility;
 Keywords=screensaver;blank;black;cover;monitor;
 StartupNotify=false
