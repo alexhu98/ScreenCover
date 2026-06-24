@@ -18,6 +18,8 @@ DEST_FILE="$DEST_DIR/screencover.desktop"
 
 # Global keyboard shortcut (override with e.g. SHORTCUT='<Super>b' ./install.sh)
 SHORTCUT="${SHORTCUT:-<Control><Alt>b}"
+# Delay (seconds) used by the launcher's "Cover after N seconds" action.
+DELAY="${DELAY:-3}"
 MK_SCHEMA="org.gnome.settings-daemon.plugins.media-keys"
 KB_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/screencover/"
 KB_SCHEMA="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding"
@@ -67,6 +69,7 @@ fi
 
 sed -e "s|__APP_PATH__|$APP_PATH|g" \
     -e "s|__ICON_PATH__|$icon|g" \
+    -e "s|__DELAY__|$DELAY|g" \
     "$APP_DIR/screencover.desktop" > "$DEST_FILE"
 
 chmod +x "$DEST_FILE"
@@ -83,5 +86,5 @@ else
     echo "gsettings not found; skipped the global shortcut."
 fi
 
-echo "Installed launcher: $DEST_FILE"
+echo "Installed launcher: $DEST_FILE (delay action: ${DELAY}s)"
 echo "Open the Apps menu, search 'ScreenCover', right-click its icon -> 'Pin to Taskbar'."

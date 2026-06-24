@@ -11,5 +11,5 @@ StartupNotify=false
 Actions=Delay;
 
 [Desktop Action Delay]
-Name=Cover after 3 seconds
-Exec=bash -c "sleep 3 && python3 __APP_PATH__"
+Name=Cover after __DELAY__ seconds
+Exec=python3 __APP_PATH__ --delay __DELAY__

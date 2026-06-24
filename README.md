@@ -58,4 +58,13 @@ launches ScreenCover from anywhere. Override the binding:
 SHORTCUT='<Super>b' ./install.sh
 ```
 
+The launcher also gets a right-click **"Cover after N seconds"** action. Set the
+delay (default 3s) at install time, and combine settings freely:
+
+```bash
+DELAY=5 SHORTCUT='<Super>b' ./install.sh
+```
+
+You can also run with a delay directly: `python screencover.py --delay 5`.
+
 Remove the launcher and shortcut with `./install.sh --uninstall`.

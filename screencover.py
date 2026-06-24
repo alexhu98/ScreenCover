@@ -82,6 +82,23 @@ class ScreenCover:
 
 
 def main():
+    import argparse
+    import time
+
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "-d",
+        "--delay",
+        type=float,
+        default=0,
+        metavar="SECONDS",
+        help="wait this many seconds before covering the screens (default: 0)",
+    )
+    args = parser.parse_args()
+
+    if args.delay > 0:
+        time.sleep(args.delay)
+
     ScreenCover().run()
 
 
