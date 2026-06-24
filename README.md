@@ -36,3 +36,35 @@ python screencover.py
 ```
 
 All screens go black. Hit any key or click to exit.
+
+## Pin to the taskbar (Zorin OS / GNOME)
+
+```bash
+./install.sh
+```
+
+This installs a desktop launcher (with the bundled `screencover.svg` icon — a
+bright badge that stays visible in dark mode) to
+`~/.local/share/applications`. Then open the **Apps menu**, search
+**"ScreenCover"**, right-click the icon and choose **"Pin to Taskbar"** /
+**"Add to Favorites"**.
+
+## Global keyboard shortcut
+
+`install.sh` also registers a global shortcut (default **`Ctrl+Alt+B`**) that
+launches ScreenCover from anywhere. Override the binding:
+
+```bash
+SHORTCUT='<Super>b' ./install.sh
+```
+
+The launcher also gets a right-click **"Cover after N seconds"** action. Set the
+delay (default 3s) at install time, and combine settings freely:
+
+```bash
+DELAY=5 SHORTCUT='<Super>b' ./install.sh
+```
+
+You can also run with a delay directly: `python screencover.py --delay 5`.
+
+Remove the launcher and shortcut with `./install.sh --uninstall`.

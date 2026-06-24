@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="badge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2c3550"/>
+      <stop offset="1" stop-color="#1f2638"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Muted dark badge background -->
+  <rect x="40" y="40" width="432" height="432" rx="96" fill="url(#badge)"/>
+
+  <!-- Crescent moon -->
+  <g transform="translate(312,196)">
+    <circle cx="0" cy="0" r="60" fill="#cdab63"/>
+    <circle cx="26" cy="-14" r="52" fill="#212a3e"/>
+  </g>
+
+  <!-- Stars -->
+  <g fill="#cdab63">
+    <path d="M150 168 l7 16 16 7 -16 7 -7 16 -7 -16 -16 -7 16 -7 z"/>
+    <path d="M190 300 l5 12 12 5 -12 5 -5 12 -5 -12 -12 -5 12 -5 z" opacity="0.9"/>
+    <path d="M340 320 l4 10 10 4 -10 4 -4 10 -4 -10 -10 -4 10 -4 z" opacity="0.85"/>
+  </g>
+
+  <!-- Dots -->
+  <g fill="#cdab63">
+    <circle cx="128" cy="248" r="5" opacity="0.8"/>
+    <circle cx="232" cy="356" r="4" opacity="0.7"/>
+    <circle cx="372" cy="288" r="5" opacity="0.75"/>
+    <circle cx="276" cy="132" r="3.5" opacity="0.65"/>
+    <circle cx="150" cy="360" r="3" opacity="0.6"/>
+  </g>
+</svg>
