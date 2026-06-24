@@ -44,10 +44,16 @@ All screens go black. Hit any key or click to exit.
 ```
 
 This installs a desktop launcher (with the bundled `screencover.svg` icon — a
-bright badge that stays visible in dark mode) to
+muted night-sky badge that stays legible in dark mode) to
 `~/.local/share/applications`. Then open the **Apps menu**, search
 **"ScreenCover"**, right-click the icon and choose **"Pin to Taskbar"** /
 **"Add to Favorites"**.
+
+The launcher runs the app through `run.sh`, which initializes **pyenv** before
+launching. The desktop/taskbar starts apps without an interactive shell, so a
+bare `python3` there can resolve to a system Python without `tkinter` and crash
+instantly — the wrapper makes the GUI use the same interpreter as your terminal.
+`install.sh` warns at install time if that interpreter can't import `tkinter`.
 
 ## Global keyboard shortcut
 
@@ -59,7 +65,7 @@ SHORTCUT='<Super>b' ./install.sh
 ```
 
 The launcher also gets a right-click **"Cover after N seconds"** action. Set the
-delay (default 3s) at install time, and combine settings freely:
+delay (default **1s**) at install time, and combine settings freely:
 
 ```bash
 DELAY=5 SHORTCUT='<Super>b' ./install.sh
@@ -67,4 +73,11 @@ DELAY=5 SHORTCUT='<Super>b' ./install.sh
 
 You can also run with a delay directly: `python screencover.py --delay 5`.
 
-Remove the launcher and shortcut with `./install.sh --uninstall`.
+## Uninstall
+
+```bash
+./uninstall.sh
+```
+
+Removes the launcher and the global keyboard shortcut and refreshes the icon
+cache. (`./install.sh --uninstall` does the same.)
