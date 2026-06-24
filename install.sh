@@ -26,7 +26,7 @@ DEST_FILE="$DEST_DIR/screencover.desktop"
 # Global keyboard shortcut (override with e.g. SHORTCUT='<Super>b' ./install.sh)
 SHORTCUT="${SHORTCUT:-<Control><Super><Alt>b}"
 # Delay (seconds) used by the launcher's "Cover after N seconds" action.
-DELAY="${DELAY:-3}"
+DELAY="${DELAY:-1}"
 MK_SCHEMA="org.gnome.settings-daemon.plugins.media-keys"
 KB_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/screencover/"
 KB_SCHEMA="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding"
