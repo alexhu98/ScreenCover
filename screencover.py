@@ -84,11 +84,21 @@ class ScreenCover:
 
     def run(self):
         if self.windows:
-            # Make sure a cover has keyboard focus so key presses are captured.
-            self.windows[0].after(100, self.windows[0].focus_force)
+            # Grab all keyboard + pointer input. Borderless (override-redirect)
+            # windows are not given keyboard focus by the window manager, so
+            # without a grab only mouse clicks arrive and key presses are lost.
+            self.windows[0].after(100, self._take_focus)
             # Arm the exit handlers only after the launch input has settled.
             self.windows[0].after(self.ARM_DELAY_MS, self._arm)
         self.root.mainloop()
+
+    def _take_focus(self):
+        win = self.windows[0]
+        try:
+            win.focus_force()
+            win.grab_set_global()
+        except tk.TclError:
+            pass
 
     def _arm(self):
         self.armed = True
