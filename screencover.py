@@ -41,10 +41,16 @@ def get_monitors():
 class ScreenCover:
     """Black, full-screen cover spanning all monitors."""
 
+    # Ignore input for this long after launch so the keystroke/click that
+    # started the app (Enter from the menu, the taskbar click, the global
+    # shortcut's modifier keys) does not immediately dismiss the cover.
+    ARM_DELAY_MS = 600
+
     def __init__(self):
         self.root = tk.Tk()
         self.root.withdraw()  # The root stays hidden; covers are Toplevels.
 
+        self.armed = False
         self.windows = []
         for x, y, width, height in get_monitors():
             self.windows.append(self._make_cover(x, y, width, height))
@@ -69,16 +75,23 @@ class ScreenCover:
         return win
 
     def exit(self, _event=None):
+        if not self.armed:
+            return  # Swallow the launch keystroke/click.
         try:
             self.root.destroy()
         except tk.TclError:
             pass
 
     def run(self):
-        # Make sure a cover has keyboard focus so key presses are captured.
         if self.windows:
+            # Make sure a cover has keyboard focus so key presses are captured.
             self.windows[0].after(100, self.windows[0].focus_force)
+            # Arm the exit handlers only after the launch input has settled.
+            self.windows[0].after(self.ARM_DELAY_MS, self._arm)
         self.root.mainloop()
+
+    def _arm(self):
+        self.armed = True
 
 
 def main():
