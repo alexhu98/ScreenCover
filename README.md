@@ -9,8 +9,10 @@ monitor (it is built and tested for multi-monitor setups, e.g. 3 screens). The
 covers sit on top of everything, but unlike a real screen saver they do **not**
 pause the machine — applications keep running in the background.
 
-Press **any key** (the **Shift** key included) or click anywhere to dismiss all
-covers and exit immediately.
+Press **any key** (the **Shift** key included) or click anywhere to **minimize**
+the covers and use your desktop normally — the app keeps running. Once the whole
+computer has been **idle for 15 minutes** (configurable, see below) the covers
+return automatically. Press **Ctrl+Q** to quit the app for good.
 
 ## Requirements
 
@@ -18,6 +20,11 @@ covers and exit immediately.
 - [`screeninfo`](https://pypi.org/project/screeninfo/) for true multi-monitor
   coverage (optional, but recommended). Without it the app falls back to the
   single virtual screen that tkinter reports.
+- An **X11** session for the idle re-cover feature. Idle time is read from the
+  X11 XScreenSaver extension (no extra Python package), falling back to the
+  `xprintidle` command if the extension is unavailable (`sudo apt-get install
+  xprintidle`). Without either, the covers stay minimized after the first
+  dismiss instead of returning.
 
 ```bash
 pip install -r requirements.txt
@@ -35,7 +42,14 @@ sudo apt-get install python3-tk
 python screencover.py
 ```
 
-All screens go black. Hit any key or click to exit.
+All screens go black. Hit any key or click to minimize; the covers return after
+15 minutes of computer-wide idle. Press Ctrl+Q to quit. Change the idle delay
+with `--idle-timeout MINUTES` (e.g. `--idle-timeout 0.25` re-covers after ~15
+seconds, handy for testing):
+
+```bash
+python screencover.py --idle-timeout 10
+```
 
 ## Pin to the taskbar (Zorin OS / GNOME)
 
