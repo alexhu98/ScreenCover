@@ -13,6 +13,12 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_PATH="$APP_DIR/screencover.py"
 ICON_PATH="$APP_DIR/screencover.svg"   # custom icon; falls back to a theme icon
 
+# Resolve the REAL interpreter currently in use (e.g. the active pyenv Python),
+# not the bare "python3" name. The desktop/taskbar launches without pyenv init,
+# so a bare "python3" there can resolve to a different Python that lacks tkinter
+# and the app would crash instantly. sys.executable bypasses pyenv shims/PATH.
+PYTHON="$(python3 -c 'import sys; print(sys.executable)')"
+
 DEST_DIR="$HOME/.local/share/applications"
 DEST_FILE="$DEST_DIR/screencover.desktop"
 
@@ -60,6 +66,13 @@ fi
 
 mkdir -p "$DEST_DIR"
 
+# Warn early if the chosen interpreter cannot import tkinter (the GUI toolkit).
+if ! "$PYTHON" -c 'import tkinter' 2>/dev/null; then
+    echo "WARNING: $PYTHON cannot import tkinter."
+    echo "         Install it (e.g. 'sudo apt install python3-tk', or for pyenv"
+    echo "         rebuild Python with tk support) or the launcher will not start."
+fi
+
 # Use the bundled icon if present, otherwise a generic theme icon.
 if [[ -f "$ICON_PATH" ]]; then
     icon="$ICON_PATH"
@@ -67,7 +80,8 @@ else
     icon="video-display"
 fi
 
-sed -e "s|__APP_PATH__|$APP_PATH|g" \
+sed -e "s|__PY__|$PYTHON|g" \
+    -e "s|__APP_PATH__|$APP_PATH|g" \
     -e "s|__ICON_PATH__|$icon|g" \
     -e "s|__DELAY__|$DELAY|g" \
     "$APP_DIR/screencover.desktop" > "$DEST_FILE"
@@ -79,7 +93,7 @@ update-desktop-database "$DEST_DIR" 2>/dev/null || true
 if command -v gsettings >/dev/null 2>&1; then
     register_shortcut yes
     gsettings set "$KB_SCHEMA:$KB_PATH" name 'ScreenCover'
-    gsettings set "$KB_SCHEMA:$KB_PATH" command "python3 $APP_PATH"
+    gsettings set "$KB_SCHEMA:$KB_PATH" command "$PYTHON $APP_PATH"
     gsettings set "$KB_SCHEMA:$KB_PATH" binding "$SHORTCUT"
     echo "Global shortcut set to: $SHORTCUT"
 else
@@ -87,4 +101,5 @@ else
 fi
 
 echo "Installed launcher: $DEST_FILE (delay action: ${DELAY}s)"
+echo "Using interpreter: $PYTHON"
 echo "Open the Apps menu, search 'ScreenCover', right-click its icon -> 'Pin to Taskbar'."

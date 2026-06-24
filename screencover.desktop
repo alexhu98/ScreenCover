@@ -2,7 +2,7 @@
 Type=Application
 Name=ScreenCover
 Comment=Cover all screens with a black canvas; press any key to exit
-Exec=python3 __APP_PATH__
+Exec=__PY__ __APP_PATH__
 Icon=__ICON_PATH__
 Terminal=false
 Categories=Utility;
@@ -12,4 +12,4 @@ Actions=Delay;
 
 [Desktop Action Delay]
 Name=Cover after __DELAY__ seconds
-Exec=python3 __APP_PATH__ --delay __DELAY__
+Exec=__PY__ __APP_PATH__ --delay __DELAY__
