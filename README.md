@@ -51,8 +51,8 @@ bright badge that stays visible in dark mode) to
 
 ## Global keyboard shortcut
 
-`install.sh` also registers a global shortcut (default **`Ctrl+Alt+B`**) that
-launches ScreenCover from anywhere. Override the binding:
+`install.sh` also registers a global shortcut (default **`Ctrl+Super+Alt+B`**)
+that launches ScreenCover from anywhere. Override the binding:
 
 ```bash
 SHORTCUT='<Super>b' ./install.sh
