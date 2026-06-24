@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=ScreenCover
-Comment=Cover all screens with a black canvas; any key minimizes, returns when idle, Ctrl+Q quits
+Comment=Cover all screens with a black canvas; any key minimizes, returns when idle, Esc quits
 Exec=__RUN__
 Icon=__ICON_PATH__
 Terminal=false

@@ -8,7 +8,7 @@ The app opens one borderless, full-screen black window per monitor. Any key
 (the Shift key included) or mouse click *minimizes* the covers so the desktop
 is usable again; the app keeps running and re-covers every screen once the
 whole computer has been idle for the configured time (15 minutes by default).
-Press Ctrl+Q to quit.
+Press Esc to quit.
 """
 
 from __future__ import annotations
@@ -131,7 +131,7 @@ class ScreenCover:
 
     Behaves like a screen saver: user input minimizes the covers (letting the
     desktop and background apps be used), and the covers return once the whole
-    computer has been idle for ``idle_timeout_ms``. Ctrl+Q quits.
+    computer has been idle for ``idle_timeout_ms``. Esc quits.
     """
 
     # Ignore input for this long after launch (and after each re-cover) so the
@@ -169,24 +169,18 @@ class ScreenCover:
         )
         canvas.pack(fill="both", expand=True)
 
-        # Ctrl+Q quits; any other key (modifier keys such as Shift included) or
-        # mouse click minimizes. The more specific Control-q binding wins over
-        # the generic <Key> binding, so Esc and friends fall through to
-        # minimize.
-        win.bind("<Control-q>", self.quit)
-        win.bind("<Control-Q>", self.quit)
+        # Esc quits; any other key (modifier keys such as Shift and Control,
+        # and combos like Ctrl+Q, included) or mouse click minimizes. The more
+        # specific Escape binding wins over the generic <Key> binding.
+        win.bind("<Escape>", self.quit)
         for sequence in ("<Key>", "<Shift_L>", "<Shift_R>", "<Button>"):
             win.bind(sequence, self._on_activity)
 
         return win
 
-    def _on_activity(self, event=None):
+    def _on_activity(self, _event=None):
         if not self.armed:
             return  # Swallow the launch keystroke/click.
-        # Ignore a bare Control press: it arrives as its own <Key> event just
-        # before the Q in Ctrl+Q, and minimizing here would steal the quit.
-        if getattr(event, "keysym", None) in ("Control_L", "Control_R"):
-            return
         self.minimize()
 
     def minimize(self):

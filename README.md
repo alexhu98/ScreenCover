@@ -12,7 +12,7 @@ pause the machine — applications keep running in the background.
 Press **any key** (the **Shift** key included) or click anywhere to **minimize**
 the covers and use your desktop normally — the app keeps running. Once the whole
 computer has been **idle for 15 minutes** (configurable, see below) the covers
-return automatically. Press **Ctrl+Q** to quit the app for good.
+return automatically. Press **Esc** to quit the app for good.
 
 ## Requirements
 
@@ -43,7 +43,7 @@ python screencover.py
 ```
 
 All screens go black. Hit any key or click to minimize; the covers return after
-15 minutes of computer-wide idle. Press Ctrl+Q to quit. Change the idle delay
+15 minutes of computer-wide idle. Press Esc to quit. Change the idle delay
 with `--idle-timeout MINUTES` (e.g. `--idle-timeout 0.25` re-covers after ~15
 seconds, handy for testing):
 
