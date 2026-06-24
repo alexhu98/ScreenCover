@@ -14,6 +14,12 @@ the covers and use your desktop normally — the app keeps running. Once the who
 computer has been **idle for 15 minutes** (configurable, see below) the covers
 return automatically. Press **Esc** to quit the app for good.
 
+Only **one instance** runs at a time. Because a minimized instance is invisible
+(no taskbar entry), launching ScreenCover again — from the taskbar icon or the
+global shortcut — does **not** start a duplicate: it tells the running instance
+to **re-cover the screens immediately**, so the same gesture doubles as a "cover
+now" button.
+
 ## Requirements
 
 - Python 3.8+
