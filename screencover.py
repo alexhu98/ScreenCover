@@ -196,7 +196,7 @@ class ScreenCover:
     # Minimize once the pointer moves more than this many pixels from where it
     # was when the first motion after arming arrived. A small threshold (rather
     # than any motion) keeps tiny jitter from dismissing the cover.
-    MOTION_THRESHOLD_PX = 10
+    MOTION_THRESHOLD_PX = 30
 
     def __init__(self, idle_timeout_ms=15 * 60 * 1000, ipc_sock=None):
         self.idle_timeout_ms = idle_timeout_ms
