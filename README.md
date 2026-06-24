@@ -19,9 +19,9 @@ While running, ScreenCover keeps a minimized window so the **taskbar shows a
 running indicator** (the dot under its icon) — you can always tell it is alive.
 
 Only **one instance** runs at a time. Launching ScreenCover again — from the
-taskbar icon or the global shortcut — does **not** start a duplicate: it tells
-the running instance to **re-cover the screens immediately**. Clicking its
-taskbar icon does the same, so either gesture doubles as a "cover now" button.
+global shortcut or the menu — does **not** start a duplicate: it tells the
+running instance to **re-cover the screens immediately**, so that gesture
+doubles as a "cover now" button.
 
 ## Requirements
 
