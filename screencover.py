@@ -5,14 +5,15 @@ Cover every connected screen with a black canvas, like a screen saver, while
 allowing applications to keep running in the background.
 
 The app opens one borderless, full-screen black window per monitor. Any key
-(the Shift key included) or mouse click *minimizes* the covers so the desktop
-is usable again; the app keeps running and re-covers every screen once the
-whole computer has been idle for the configured time (15 minutes by default).
-Press Esc to quit.
+(the Shift key included), a mouse click, or moving the mouse past a small
+threshold *minimizes* the covers so the desktop is usable again; the app keeps
+running and re-covers every screen once the whole computer has been idle for the
+configured time (15 minutes by default). Press Esc to quit.
 
-Only one instance runs at a time: launching ScreenCover again (from the taskbar
-or the global shortcut) re-covers the screens on the running instance instead of
-opening a duplicate.
+Only one instance runs at a time, and while running it keeps a minimized window
+so the taskbar shows a running indicator. Launching ScreenCover again (from the
+taskbar or the global shortcut), or clicking its taskbar icon, re-covers the
+screens on the running instance instead of opening a duplicate.
 """
 
 from __future__ import annotations
@@ -192,16 +193,31 @@ class ScreenCover:
     # How often to check for a re-cover signal from a relaunched instance.
     IPC_POLL_MS = 250
 
+    # Minimize once the pointer moves more than this many pixels from where it
+    # sat when the cover armed. A threshold (rather than any motion) keeps a
+    # tiny jitter or the residual movement from launching from dismissing it.
+    MOTION_THRESHOLD_PX = 30
+
     def __init__(self, idle_timeout_ms=15 * 60 * 1000, ipc_sock=None):
         self.idle_timeout_ms = idle_timeout_ms
         self.ipc_sock = ipc_sock
 
-        self.root = tk.Tk()
-        self.root.withdraw()  # The root stays hidden; covers are Toplevels.
+        # Keep the root window WM-managed but minimized (rather than withdrawn)
+        # so the taskbar shows a running indicator while ScreenCover is alive.
+        # The class name sets WM_CLASS, which the shell matches against the
+        # launcher's StartupWMClass. The covers are override-redirect Toplevels
+        # and are unaffected by the root staying iconified.
+        self.root = tk.Tk(className="ScreenCover")
+        self.root.title("ScreenCover")
+        self.root.bind("<Map>", self._on_root_activated)
+        self.root.iconify()
 
         self.armed = False
         self.covered = True
         self.idle_unavailable = False  # True once we've given up on idle polls.
+        # Pointer position captured when the cover arms; motion past the
+        # threshold from here minimizes. ``None`` until the first arm.
+        self._pointer_anchor = None
         self.windows = []
         for x, y, width, height in get_monitors():
             self.windows.append(self._make_cover(x, y, width, height))
@@ -225,6 +241,9 @@ class ScreenCover:
         win.bind("<Escape>", self.quit)
         for sequence in ("<Key>", "<Shift_L>", "<Shift_R>", "<Button>"):
             win.bind(sequence, self._on_activity)
+        # Pointer motion minimizes too, but only past a threshold (see
+        # _on_motion) so a tiny jitter does not dismiss the cover.
+        win.bind("<Motion>", self._on_motion)
 
         return win
 
@@ -232,6 +251,26 @@ class ScreenCover:
         if not self.armed:
             return  # Swallow the launch keystroke/click.
         self.minimize()
+
+    def _on_motion(self, event):
+        if not self.armed or self._pointer_anchor is None:
+            return
+        ax, ay = self._pointer_anchor
+        if abs(event.x_root - ax) >= self.MOTION_THRESHOLD_PX or abs(
+            event.y_root - ay
+        ) >= self.MOTION_THRESHOLD_PX:
+            self.minimize()
+
+    def _on_root_activated(self, event=None):
+        # Clicking the taskbar icon un-minimizes (maps) the tracker root window.
+        # Treat it as "cover now" and snap the root back to minimized so the
+        # empty window never actually shows. Re-minimizing emits only <Unmap>,
+        # so there is no feedback loop.
+        if event is not None and event.widget is not self.root:
+            return  # Ignore Map events bubbling up from child widgets.
+        if not self.covered:
+            self.cover()
+        self.root.iconify()
 
     def minimize(self):
         """Hide every cover so the desktop is usable; poll for idle to return."""
@@ -329,6 +368,12 @@ class ScreenCover:
             pass
 
     def _arm(self):
+        # Anchor the pointer here so _on_motion measures movement from the
+        # moment the cover became dismissable, not from launch.
+        try:
+            self._pointer_anchor = self.root.winfo_pointerxy()
+        except tk.TclError:
+            self._pointer_anchor = None
         self.armed = True
 
 

@@ -9,16 +9,19 @@ monitor (it is built and tested for multi-monitor setups, e.g. 3 screens). The
 covers sit on top of everything, but unlike a real screen saver they do **not**
 pause the machine — applications keep running in the background.
 
-Press **any key** (the **Shift** key included) or click anywhere to **minimize**
-the covers and use your desktop normally — the app keeps running. Once the whole
-computer has been **idle for 15 minutes** (configurable, see below) the covers
-return automatically. Press **Esc** to quit the app for good.
+Press **any key** (the **Shift** key included), click anywhere, or **move the
+mouse** past a small threshold to **minimize** the covers and use your desktop
+normally — the app keeps running. Once the whole computer has been **idle for 15
+minutes** (configurable, see below) the covers return automatically. Press
+**Esc** to quit the app for good.
 
-Only **one instance** runs at a time. Because a minimized instance is invisible
-(no taskbar entry), launching ScreenCover again — from the taskbar icon or the
-global shortcut — does **not** start a duplicate: it tells the running instance
-to **re-cover the screens immediately**, so the same gesture doubles as a "cover
-now" button.
+While running, ScreenCover keeps a minimized window so the **taskbar shows a
+running indicator** (the dot under its icon) — you can always tell it is alive.
+
+Only **one instance** runs at a time. Launching ScreenCover again — from the
+taskbar icon or the global shortcut — does **not** start a duplicate: it tells
+the running instance to **re-cover the screens immediately**. Clicking its
+taskbar icon does the same, so either gesture doubles as a "cover now" button.
 
 ## Requirements
 
