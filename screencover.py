@@ -9,12 +9,58 @@ The app opens one borderless, full-screen black window per monitor. Any key
 is usable again; the app keeps running and re-covers every screen once the
 whole computer has been idle for the configured time (15 minutes by default).
 Press Esc to quit.
+
+Only one instance runs at a time: launching ScreenCover again (from the taskbar
+or the global shortcut) re-covers the screens on the running instance instead of
+opening a duplicate.
 """
 
 from __future__ import annotations
 
 import ctypes
+import errno
+import os
+import socket
 import tkinter as tk
+
+
+# Abstract-namespace UNIX socket used as a single-instance lock and a "re-cover"
+# signal channel. The leading NUL byte puts it in Linux's abstract namespace, so
+# the name is released automatically when the process dies (no stale lock files,
+# no PID-reuse races). Per-user so two desktop users do not clash.
+def _instance_addr():
+    return f"\0screencover-{os.getuid()}"
+
+
+def try_become_primary():
+    """Claim the single-instance lock.
+
+    Returns a bound, non-blocking datagram socket if we are the first instance,
+    or ``None`` if another instance already owns the lock (or the lock cannot be
+    used, e.g. on a non-Linux platform — in which case we simply run without the
+    guard rather than crash).
+    """
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    try:
+        sock.bind(_instance_addr())
+    except OSError as exc:
+        sock.close()
+        if exc.errno == errno.EADDRINUSE:
+            return None  # Another instance holds the lock.
+        return None  # Abstract sockets unsupported, etc.; degrade gracefully.
+    sock.setblocking(False)
+    return sock
+
+
+def signal_existing_instance():
+    """Tell the already-running instance to re-cover the screens."""
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    try:
+        client.sendto(b"cover", _instance_addr())
+    except OSError:
+        pass
+    finally:
+        client.close()
 
 
 class _XScreenSaverInfo(ctypes.Structure):
@@ -143,8 +189,12 @@ class ScreenCover:
     # How often to check system idle time while minimized.
     POLL_INTERVAL_MS = 2000
 
-    def __init__(self, idle_timeout_ms=15 * 60 * 1000):
+    # How often to check for a re-cover signal from a relaunched instance.
+    IPC_POLL_MS = 250
+
+    def __init__(self, idle_timeout_ms=15 * 60 * 1000, ipc_sock=None):
         self.idle_timeout_ms = idle_timeout_ms
+        self.ipc_sock = ipc_sock
 
         self.root = tk.Tk()
         self.root.withdraw()  # The root stays hidden; covers are Toplevels.
@@ -230,7 +280,29 @@ class ScreenCover:
             self.windows[0].after(100, self._take_focus)
             self.windows[0].after(self.ARM_DELAY_MS, self._arm)
 
+    def _poll_ipc(self):
+        """Re-cover if a relaunched instance signalled us, then reschedule."""
+        signalled = False
+        try:
+            while True:
+                self.ipc_sock.recv(64)  # Drain every pending datagram.
+                signalled = True
+        except BlockingIOError:
+            pass
+        except OSError:
+            pass
+        if signalled:
+            # cover() is a no-op while already covered, so this only has an
+            # effect when we are currently minimized.
+            self.cover()
+        self.root.after(self.IPC_POLL_MS, self._poll_ipc)
+
     def quit(self, _event=None):
+        if self.ipc_sock is not None:
+            try:
+                self.ipc_sock.close()
+            except OSError:
+                pass
         try:
             self.root.destroy()
         except tk.TclError:
@@ -244,6 +316,8 @@ class ScreenCover:
             self.windows[0].after(100, self._take_focus)
             # Arm the input handlers only after the launch input has settled.
             self.windows[0].after(self.ARM_DELAY_MS, self._arm)
+        if self.ipc_sock is not None:
+            self.root.after(self.IPC_POLL_MS, self._poll_ipc)
         self.root.mainloop()
 
     def _take_focus(self):
@@ -282,10 +356,20 @@ def main():
     )
     args = parser.parse_args()
 
+    # Claim the single-instance lock before anything visible (and before the
+    # delay sleep) so a double-launch during the delay is still caught.
+    server = try_become_primary()
+    if server is None:
+        signal_existing_instance()
+        print("ScreenCover is already running; re-covering the screens.")
+        return
+
     if args.delay > 0:
         time.sleep(args.delay)
 
-    ScreenCover(idle_timeout_ms=int(args.idle_timeout * 60 * 1000)).run()
+    ScreenCover(
+        idle_timeout_ms=int(args.idle_timeout * 60 * 1000), ipc_sock=server
+    ).run()
 
 
 if __name__ == "__main__":
