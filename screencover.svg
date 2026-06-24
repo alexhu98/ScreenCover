@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="badge" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2c3550"/>
-      <stop offset="1" stop-color="#1f2638"/>
+      <stop offset="0" stop-color="#3a456a"/>
+      <stop offset="1" stop-color="#2a3350"/>
     </linearGradient>
   </defs>
 
@@ -12,7 +12,7 @@
   <!-- Crescent moon -->
   <g transform="translate(312,196)">
     <circle cx="0" cy="0" r="60" fill="#cdab63"/>
-    <circle cx="26" cy="-14" r="52" fill="#212a3e"/>
+    <circle cx="26" cy="-14" r="52" fill="#354061"/>
   </g>
 
   <!-- Stars -->
