@@ -13,11 +13,12 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_PATH="$APP_DIR/screencover.py"
 ICON_PATH="$APP_DIR/screencover.svg"   # custom icon; falls back to a theme icon
 
-# Resolve the REAL interpreter currently in use (e.g. the active pyenv Python),
-# not the bare "python3" name. The desktop/taskbar launches without pyenv init,
-# so a bare "python3" there can resolve to a different Python that lacks tkinter
-# and the app would crash instantly. sys.executable bypasses pyenv shims/PATH.
-PYTHON="$(python3 -c 'import sys; print(sys.executable)')"
+# The desktop/taskbar launches without an interactive shell, so pyenv is not
+# initialized and a bare "python3" there can resolve to a different Python that
+# lacks tkinter (the app would crash instantly). run.sh initializes pyenv before
+# launching, so the GUI uses the same interpreter as an interactive terminal.
+RUN_PATH="$APP_DIR/run.sh"
+chmod +x "$RUN_PATH" "$APP_PATH" 2>/dev/null || true
 
 DEST_DIR="$HOME/.local/share/applications"
 DEST_FILE="$DEST_DIR/screencover.desktop"
@@ -66,9 +67,10 @@ fi
 
 mkdir -p "$DEST_DIR"
 
-# Warn early if the chosen interpreter cannot import tkinter (the GUI toolkit).
-if ! "$PYTHON" -c 'import tkinter' 2>/dev/null; then
-    echo "WARNING: $PYTHON cannot import tkinter."
+# Warn early if launching through the wrapper cannot import tkinter (the GUI
+# toolkit). This exercises the same pyenv-initialized path the launcher uses.
+if ! "$RUN_PATH" --check-tk 2>/dev/null; then
+    echo "WARNING: the launch wrapper's Python cannot import tkinter."
     echo "         Install it (e.g. 'sudo apt install python3-tk', or for pyenv"
     echo "         rebuild Python with tk support) or the launcher will not start."
 fi
@@ -80,8 +82,7 @@ else
     icon="video-display"
 fi
 
-sed -e "s|__PY__|$PYTHON|g" \
-    -e "s|__APP_PATH__|$APP_PATH|g" \
+sed -e "s|__RUN__|$RUN_PATH|g" \
     -e "s|__ICON_PATH__|$icon|g" \
     -e "s|__DELAY__|$DELAY|g" \
     "$APP_DIR/screencover.desktop" > "$DEST_FILE"
@@ -93,7 +94,7 @@ update-desktop-database "$DEST_DIR" 2>/dev/null || true
 if command -v gsettings >/dev/null 2>&1; then
     register_shortcut yes
     gsettings set "$KB_SCHEMA:$KB_PATH" name 'ScreenCover'
-    gsettings set "$KB_SCHEMA:$KB_PATH" command "$PYTHON $APP_PATH"
+    gsettings set "$KB_SCHEMA:$KB_PATH" command "$RUN_PATH"
     gsettings set "$KB_SCHEMA:$KB_PATH" binding "$SHORTCUT"
     echo "Global shortcut set to: $SHORTCUT"
 else
@@ -101,5 +102,5 @@ else
 fi
 
 echo "Installed launcher: $DEST_FILE (delay action: ${DELAY}s)"
-echo "Using interpreter: $PYTHON"
+echo "Launching via: $RUN_PATH (pyenv-aware)"
 echo "Open the Apps menu, search 'ScreenCover', right-click its icon -> 'Pin to Taskbar'."
