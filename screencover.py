@@ -10,10 +10,9 @@ threshold *minimizes* the covers so the desktop is usable again; the app keeps
 running and re-covers every screen once the whole computer has been idle for the
 configured time (15 minutes by default). Press Esc to quit.
 
-Only one instance runs at a time, and while running it keeps a minimized window
-so the taskbar shows a running indicator. Launching ScreenCover again (from the
-global shortcut or the menu), or clicking its taskbar icon, re-covers the screens
-on the running instance instead of opening a duplicate.
+Only one instance runs at a time. Launching ScreenCover again (from the taskbar
+icon, the global shortcut, or the menu) re-covers the screens on the running
+instance instead of opening a duplicate.
 """
 
 from __future__ import annotations
@@ -217,22 +216,8 @@ class ScreenCover:
         self.idle_timeout_ms = idle_timeout_ms
         self.ipc_sock = ipc_sock
 
-        self.root = tk.Tk(className="ScreenCover")
-        self.root.withdraw()  # Root stays hidden; covers + tracker are Toplevels.
-
-        # A dedicated, WM-managed tracker window gives the taskbar a running
-        # indicator (the dot) while ScreenCover is alive. It is kept minimized so
-        # it is never visible on screen. Crucially it is a SIBLING of the covers
-        # (both Toplevels of the hidden root), so iconifying it never disturbs
-        # the covers' input grab -- iconifying the root *master* would cascade to
-        # the covers and break motion/key capture. ``class_`` sets WM_CLASS to
-        # "Screencover", which the shell matches against the launcher's
-        # StartupWMClass; "Screencover" is already in Tk's normalized form
-        # (lowercased then first letter capitalized), so it survives verbatim.
-        self.tracker = tk.Toplevel(self.root, class_="Screencover")
-        self.tracker.title("ScreenCover")
-        self.tracker.bind("<Map>", self._on_tracker_mapped)
-        self.tracker.iconify()
+        self.root = tk.Tk()
+        self.root.withdraw()  # The root stays hidden; covers are Toplevels.
 
         self.armed = False
         self.covered = True
@@ -274,18 +259,6 @@ class ScreenCover:
         if not self.armed:
             return  # Swallow the launch keystroke/click.
         self.minimize()
-
-    def _on_tracker_mapped(self, event=None):
-        # The tracker maps at startup and whenever its taskbar icon is clicked.
-        # Always snap it straight back to minimized so no blank window lingers.
-        # Iconifying the tracker is safe: it is a sibling of the covers, so it
-        # does not touch their grab (re-minimizing emits only <Unmap>, no loop).
-        if event is not None and event.widget is not self.tracker:
-            return  # Ignore Map events bubbling from child widgets.
-        _log("tracker <Map> (covered=%s)" % self.covered)
-        self.tracker.iconify()
-        if not self.covered:
-            self.cover()  # Restored from minimized via the icon -> cover now.
 
     def _on_motion(self, event):
         if not self.armed:
