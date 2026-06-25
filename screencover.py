@@ -12,8 +12,8 @@ configured time (15 minutes by default). Press Esc to quit.
 
 Only one instance runs at a time, and while running it keeps a minimized window
 so the taskbar shows a running indicator. Launching ScreenCover again (from the
-global shortcut or the menu) re-covers the screens on the running instance
-instead of opening a duplicate.
+global shortcut or the menu), or clicking its taskbar icon, re-covers the screens
+on the running instance instead of opening a duplicate.
 """
 
 from __future__ import annotations
@@ -212,6 +212,8 @@ class ScreenCover:
         # Toplevels and are unaffected by the root staying iconified.
         self.root = tk.Tk(className="ScreenCover")
         self.root.title("ScreenCover")
+        # Clicking the taskbar icon restores (maps) this window; re-cover then.
+        self.root.bind("<Map>", self._on_root_activated)
         self.root.iconify()
 
         self.armed = False
@@ -254,6 +256,16 @@ class ScreenCover:
         if not self.armed:
             return  # Swallow the launch keystroke/click.
         self.minimize()
+
+    def _on_root_activated(self, event=None):
+        # Clicking the taskbar icon restores (maps) the tracker root. Treat it as
+        # "cover now" and snap the root back to minimized so the empty window
+        # never shows. Re-minimizing emits only <Unmap>, so there is no loop.
+        if event is not None and event.widget is not self.root:
+            return  # Ignore Map events bubbling from child widgets.
+        if not self.covered:
+            self.cover()
+        self.root.iconify()
 
     def _on_motion(self, event):
         if not self.armed:
