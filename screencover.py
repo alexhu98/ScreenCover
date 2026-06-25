@@ -12,8 +12,8 @@ configured time (15 minutes by default). Press Esc to quit.
 
 Only one instance runs at a time, and while running it keeps a minimized window
 so the taskbar shows a running indicator. Launching ScreenCover again (from the
-global shortcut or the menu) re-covers the screens on the running instance
-instead of opening a duplicate.
+global shortcut or the menu), or clicking its taskbar icon, re-covers the screens
+on the running instance instead of opening a duplicate.
 """
 
 from __future__ import annotations
@@ -22,7 +22,17 @@ import ctypes
 import errno
 import os
 import socket
+import sys
 import tkinter as tk
+
+
+# Opt-in diagnostics: enabled by --debug. When off, _log is a no-op.
+DEBUG = False
+
+
+def _log(msg):
+    if DEBUG:
+        print("[screencover] %s" % msg, file=sys.stderr, flush=True)
 
 
 # Abstract-namespace UNIX socket used as a single-instance lock and a "re-cover"
@@ -100,11 +110,14 @@ def _init_xss():
 
         dpy = xlib.XOpenDisplay(None)
         if not dpy:
+            _log("XScreenSaver: XOpenDisplay(None) returned NULL")
             return False
         root = xlib.XDefaultRootWindow(dpy)
         info = xss.XScreenSaverAllocInfo()
+        _log("XScreenSaver: initialized OK")
         return (xss, dpy, root, info)
-    except Exception:
+    except Exception as exc:
+        _log("XScreenSaver: init failed: %r" % (exc,))
         return False
 
 
@@ -118,8 +131,9 @@ def _xprintidle_ms():
         )
         if out.returncode == 0:
             return int(out.stdout.strip())
-    except Exception:
-        pass
+        _log("xprintidle: exit %s, stderr=%r" % (out.returncode, out.stderr))
+    except Exception as exc:
+        _log("xprintidle: failed: %r" % (exc,))
     return None
 
 
@@ -140,9 +154,10 @@ def system_idle_ms():
             xss, dpy, root, info = _xss_state
             xss.XScreenSaverQueryInfo(dpy, root, info)
             return int(info.contents.idle)
-        except Exception:
+        except Exception as exc:
             # Query failed (e.g. display went away); drop the cached handles
             # and let the fallback try from here on.
+            _log("XScreenSaver: query failed: %r" % (exc,))
             _xss_state = False
 
     return _xprintidle_ms()
@@ -212,6 +227,8 @@ class ScreenCover:
         # Toplevels and are unaffected by the root staying iconified.
         self.root = tk.Tk(className="ScreenCover")
         self.root.title("ScreenCover")
+        # Clicking the taskbar icon restores (maps) this window; re-cover then.
+        self.root.bind("<Map>", self._on_root_activated)
         self.root.iconify()
 
         self.armed = False
@@ -255,6 +272,20 @@ class ScreenCover:
             return  # Swallow the launch keystroke/click.
         self.minimize()
 
+    def _on_root_activated(self, event=None):
+        # Fires when the tracker root is mapped. The covers are topmost and
+        # opaque, and the taskbar is unreachable while covered, so a mapped root
+        # is only ever visible after a minimize -- act only when NOT covered.
+        # (Acting while covered churns iconify() against the WM at startup and
+        # can break the cover's input grab, stopping motion events.)
+        if event is not None and event.widget is not self.root:
+            return  # Ignore Map events bubbling from child widgets.
+        _log("root <Map> (covered=%s)" % self.covered)
+        if self.covered:
+            return
+        self.cover()  # Restored from minimized via the taskbar icon -> cover now.
+        self.root.iconify()
+
     def _on_motion(self, event):
         if not self.armed:
             return
@@ -263,17 +294,19 @@ class ScreenCover:
         # then minimize once the pointer leaves the threshold box around it.
         if self._pointer_anchor is None:
             self._pointer_anchor = (event.x_root, event.y_root)
+            _log("motion: anchor set at %s" % (self._pointer_anchor,))
             return
         ax, ay = self._pointer_anchor
-        if abs(event.x_root - ax) >= self.MOTION_THRESHOLD_PX or abs(
-            event.y_root - ay
-        ) >= self.MOTION_THRESHOLD_PX:
+        dx, dy = event.x_root - ax, event.y_root - ay
+        _log("motion: at (%s,%s) delta (%s,%s)" % (event.x_root, event.y_root, dx, dy))
+        if abs(dx) >= self.MOTION_THRESHOLD_PX or abs(dy) >= self.MOTION_THRESHOLD_PX:
             self.minimize()
 
     def minimize(self):
         """Hide every cover so the desktop is usable; poll for idle to return."""
         if not self.covered:
             return
+        _log("minimize")
         self.covered = False
         self.armed = False
         try:
@@ -295,8 +328,10 @@ class ScreenCover:
         if idle is None:
             # No idle backend available; stop polling rather than busy-loop.
             # The covers stay minimized until the app is quit or relaunched.
+            _log("idle: no backend available; giving up (will not re-cover)")
             self.idle_unavailable = True
             return
+        _log("idle: %s ms (timeout %s ms)" % (idle, self.idle_timeout_ms))
         if idle >= self.idle_timeout_ms:
             self.cover()
         else:
@@ -306,6 +341,7 @@ class ScreenCover:
         """Re-show every cover, grab input, and re-arm after a short delay."""
         if self.covered:
             return
+        _log("cover")
         self.covered = True
         for win in self.windows:
             try:
@@ -362,8 +398,9 @@ class ScreenCover:
         try:
             win.focus_force()
             win.grab_set_global()
-        except tk.TclError:
-            pass
+            _log("grab_set_global on cover[0] OK")
+        except tk.TclError as exc:
+            _log("grab/focus failed: %r" % (exc,))
 
     def _arm(self):
         # Reset the motion baseline; _on_motion re-establishes it from the first
@@ -371,6 +408,7 @@ class ScreenCover:
         # cover became dismissable rather than from launch.
         self._pointer_anchor = None
         self.armed = True
+        _log("armed")
 
 
 def main():
@@ -395,7 +433,15 @@ def main():
         help="re-cover the screens after the computer is idle this many "
         "minutes (default: 15)",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="print diagnostic events (idle, motion, cover/minimize) to stderr",
+    )
     args = parser.parse_args()
+
+    global DEBUG
+    DEBUG = args.debug
 
     # Claim the single-instance lock before anything visible (and before the
     # delay sleep) so a double-launch during the delay is still caught.
