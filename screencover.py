@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 """ScreenCover.
 
-Cover every connected screen with a black canvas, like a screen saver, while
-allowing applications to keep running in the background.
+Blank every connected screen, like a screen saver, while allowing applications
+to keep running in the background.
 
-The app opens one borderless, full-screen black window per monitor. Any key
-(the Shift key included), a mouse click, or moving the mouse past a small
-threshold *minimizes* the covers so the desktop is usable again; the app keeps
-running and re-covers every screen once the whole computer has been idle for the
-configured time (15 minutes by default). Press Esc to quit.
+By default ScreenCover powers the displays off through the X11 DPMS extension
+(``xset dpms force off``) so the panels go truly dark and save power; pass
+``--blank`` to instead keep the displays on under a solid black window. In both
+modes a borderless black cover is layered over each monitor and grabs input, so
+the first key (the Shift key included), mouse click, or mouse move past a small
+threshold *minimizes* the cover — and, in the default mode, wakes the displays —
+to make the desktop usable again. The app keeps running and re-covers (turning
+the displays back off) once the whole computer has been idle for the configured
+time (15 minutes by default). Press Esc to quit.
+
+Powering the displays off does not pause the machine: background applications
+keep running exactly as in blank mode. Only the monitors' power state changes.
 
 Only one instance runs at a time. Launching ScreenCover again (from the taskbar
 icon, the global shortcut, or the menu) re-covers the screens on the running
@@ -212,9 +219,18 @@ class ScreenCover:
     # than any motion) keeps tiny jitter from dismissing the cover.
     MOTION_THRESHOLD_PX = 30
 
-    def __init__(self, idle_timeout_ms=15 * 60 * 1000, ipc_sock=None):
+    def __init__(
+        self, idle_timeout_ms=15 * 60 * 1000, ipc_sock=None, screen_off=True
+    ):
         self.idle_timeout_ms = idle_timeout_ms
         self.ipc_sock = ipc_sock
+        # When True (the default), power the displays off via DPMS once the
+        # cover has armed, on top of the black overlay. When False (--blank),
+        # only the black overlay is shown and the displays stay on.
+        self.screen_off = screen_off
+        # Becomes True once we've found that the displays cannot be powered off
+        # (xset missing or DPMS unavailable); we then behave like blank mode.
+        self.dpms_unavailable = False
 
         self.root = tk.Tk()
         self.root.withdraw()  # The root stays hidden; covers are Toplevels.
@@ -383,6 +399,36 @@ class ScreenCover:
         self._pointer_anchor = None
         self.armed = True
         _log("armed")
+        # Power the displays off only after the launch/re-cover input has
+        # settled. Doing it here (rather than the moment the cover is shown)
+        # avoids the launch keystroke or shortcut chord immediately waking the
+        # monitors back up. Any later input wakes them via the hardware, and the
+        # same event reaches the grabbing overlay and dismisses the cover.
+        self._power_off_displays()
+
+    def _power_off_displays(self):
+        """Turn the monitors off via DPMS, if in --off mode and available.
+
+        Best effort: a missing ``xset`` or a server without DPMS just leaves the
+        black overlay up (i.e. degrades to blank mode) instead of failing.
+        """
+        if not self.screen_off or self.dpms_unavailable:
+            return
+        import subprocess
+
+        try:
+            result = subprocess.run(
+                ["xset", "dpms", "force", "off"], timeout=2
+            )
+            if result.returncode != 0:
+                _log("xset dpms force off: exit %s" % result.returncode)
+                self.dpms_unavailable = True
+            else:
+                _log("xset dpms force off issued")
+        except Exception as exc:
+            # xset not installed, no display, etc.; stop trying and stay blank.
+            _log("xset dpms force off failed: %r" % (exc,))
+            self.dpms_unavailable = True
 
 
 def main():
@@ -408,6 +454,12 @@ def main():
         "minutes (default: 15)",
     )
     parser.add_argument(
+        "--blank",
+        action="store_true",
+        help="keep the displays on under a solid black overlay instead of "
+        "powering them off (the default turns the displays off via DPMS)",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="print diagnostic events (idle, motion, cover/minimize) to stderr",
@@ -429,7 +481,9 @@ def main():
         time.sleep(args.delay)
 
     ScreenCover(
-        idle_timeout_ms=int(args.idle_timeout * 60 * 1000), ipc_sock=server
+        idle_timeout_ms=int(args.idle_timeout * 60 * 1000),
+        ipc_sock=server,
+        screen_off=not args.blank,
     ).run()
 
 
