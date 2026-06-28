@@ -1,19 +1,27 @@
 # ScreenCover
 
-Cover all screens with black canvas, like a screen saver but allow applications to run in the background.
+Blank all screens, like a screen saver but allow applications to run in the background.
 
 ## What it does
 
-ScreenCover opens a borderless, full-screen **black** window on every connected
-monitor (it is built and tested for multi-monitor setups, e.g. 3 screens). The
-covers sit on top of everything, but unlike a real screen saver they do **not**
-pause the machine — applications keep running in the background.
+ScreenCover blanks the screens in **two stages**:
+
+1. **Blank** — once the computer has been **idle for 15 minutes** (configurable),
+   a borderless **black** cover is layered over every connected monitor with the
+   displays still on (built and tested for multi-monitor setups, e.g. 3 screens).
+2. **Off** — if the cover is not dismissed for a further **45 minutes**
+   (configurable), the displays are **powered off** via the X11 DPMS extension
+   (`xset dpms force off`) so the panels go truly dark and save power.
+
+Unlike a real screen saver it does **not** pause the machine — applications keep
+running in the background; only the monitors' power state changes. Pass
+**`--blank`** to skip stage 2 and only ever blank the screens.
 
 Press **any key** (the **Shift** key included), click anywhere, or **move the
-mouse** past a small threshold to **minimize** the covers and use your desktop
-normally — the app keeps running. Once the whole computer has been **idle for 15
-minutes** (configurable, see below) the covers return automatically. Press
-**Esc** to quit the app for good.
+mouse** past a small threshold to **minimize** the cover — which also **wakes the
+displays** if they were off — and use your desktop normally; the app keeps
+running. The two-stage cover then returns automatically after the next idle
+period. Press **Esc** to quit the app for good.
 
 Only **one instance** runs at a time. Launching ScreenCover again — from the
 taskbar icon, the global shortcut, or the menu — does **not** start a duplicate:
@@ -31,6 +39,10 @@ launch gesture doubles as a "cover now" button.
   `xprintidle` command if the extension is unavailable (`sudo apt-get install
   xprintidle`). Without either, the covers stay minimized after the first
   dismiss instead of returning.
+- **`xset`** (from `x11-xserver-utils`, usually preinstalled) with **DPMS**
+  enabled, for the default display power-off. If `xset` is missing or DPMS is
+  unavailable, ScreenCover automatically falls back to the black overlay (the
+  same as `--blank`).
 
 ```bash
 pip install -r requirements.txt
@@ -48,13 +60,22 @@ sudo apt-get install python3-tk
 python screencover.py
 ```
 
-All screens go black. Hit any key or click to minimize; the covers return after
-15 minutes of computer-wide idle. Press Esc to quit. Change the idle delay
-with `--idle-timeout MINUTES` (e.g. `--idle-timeout 0.25` re-covers after ~15
-seconds, handy for testing):
+The screens blank after 15 minutes of computer-wide idle, then the displays
+power off 45 minutes after that. Hit any key or click to wake the screens and
+minimize the cover. Press Esc to quit.
+
+To **never** power the displays off (only ever blank), use `--blank`:
 
 ```bash
-python screencover.py --idle-timeout 10
+python screencover.py --blank
+```
+
+Tune the two stages with `--idle-timeout MINUTES` (when to blank) and
+`--off-delay MINUTES` (how long after blanking to power off). Small values are
+handy for testing — e.g. blank after ~6 s, power off ~6 s later:
+
+```bash
+python screencover.py --idle-timeout 0.1 --off-delay 0.1
 ```
 
 ## Pin to the taskbar (Zorin OS / GNOME)
