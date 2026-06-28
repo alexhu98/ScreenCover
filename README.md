@@ -78,6 +78,32 @@ handy for testing — e.g. blank after ~6 s, power off ~6 s later:
 python screencover.py --idle-timeout 0.1 --off-delay 0.1
 ```
 
+## Command-line options
+
+| Option | Argument | Default | Description |
+| --- | --- | --- | --- |
+| `-d`, `--delay` | `SECONDS` | `0` | Wait this many seconds before covering the screens after launch. |
+| `-i`, `--idle-timeout` | `MINUTES` | `15` | Blank the screens (show the black cover) after the computer has been idle this many minutes. |
+| `--off-delay` | `MINUTES` | `45` | Power the displays off (via DPMS) this many minutes after the screens blank. Ignored when `--blank` is set. |
+| `--blank` | — | off (powers off) | Only ever blank the screens; never power the displays off (skip the off stage). |
+| `--debug` | — | off | Print diagnostic events (idle, motion, cover/minimize, power-off) to stderr. |
+| `-h`, `--help` | — | — | Show the help message and exit. |
+
+`SECONDS` and `MINUTES` accept fractions (e.g. `--idle-timeout 0.25` ≈ 15
+seconds). All defaults assume the standard two-stage flow: blank at 15 minutes
+idle, then displays off 45 minutes later.
+
+Examples:
+
+```bash
+python screencover.py                            # blank at 15 min, off at 60 min
+python screencover.py --idle-timeout 10          # blank at 10 min, off at 55 min
+python screencover.py --idle-timeout 5 --off-delay 30   # blank at 5 min, off at 35 min
+python screencover.py --blank                    # only ever blank; never power off
+python screencover.py --delay 5                  # cover 5 seconds after launch
+python screencover.py --idle-timeout 0.1 --off-delay 0.1 --debug   # fast test
+```
+
 ## Pin to the taskbar (Zorin OS / GNOME)
 
 ```bash
