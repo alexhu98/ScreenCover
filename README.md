@@ -122,10 +122,22 @@ bare `python3` there can resolve to a system Python without `tkinter` and crash
 instantly — the wrapper makes the GUI use the same interpreter as your terminal.
 `install.sh` warns at install time if that interpreter can't import `tkinter`.
 
-## Global keyboard shortcut
+## Keyboard shortcuts
 
-`install.sh` also registers a global shortcut (default **`Ctrl+Super+Alt+B`**)
-that launches ScreenCover from anywhere. Override the binding:
+**Global shortcut (launch / cover now):** **`Ctrl+Super+Alt+B`** — this is the
+default registered by `install.sh`. Press it from anywhere to launch ScreenCover,
+or to re-cover the screens immediately if it is already running. (`Super` is the
+Windows/⊞ key.)
+
+**While the screens are covered:**
+
+| Key / action | Effect |
+| --- | --- |
+| `Esc` | Quit ScreenCover |
+| Any other key, mouse click, or mouse move (> ~30 px) | Wake the displays and minimize the cover |
+
+`install.sh` registers the global shortcut as a GNOME custom keybinding.
+Override the binding at install time:
 
 ```bash
 SHORTCUT='<Super>b' ./install.sh
