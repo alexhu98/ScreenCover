@@ -4,18 +4,22 @@
 Blank every connected screen, like a screen saver, while allowing applications
 to keep running in the background.
 
-By default ScreenCover powers the displays off through the X11 DPMS extension
-(``xset dpms force off``) so the panels go truly dark and save power; pass
-``--blank`` to instead keep the displays on under a solid black window. In both
-modes a borderless black cover is layered over each monitor and grabs input, so
-the first key (the Shift key included), mouse click, or mouse move past a small
-threshold *minimizes* the cover — and, in the default mode, wakes the displays —
-to make the desktop usable again. The app keeps running and re-covers (turning
-the displays back off) once the whole computer has been idle for the configured
-time (15 minutes by default). Press Esc to quit.
+Covering happens in two stages. Once the whole computer has been idle for the
+configured time (15 minutes by default) a borderless black cover is layered over
+each monitor with the displays still on (the "blank" stage). If the cover is not
+dismissed for a further delay (45 minutes by default) the displays are then
+powered off through the X11 DPMS extension (``xset dpms force off``) so the
+panels go truly dark and save power (the "off" stage). Pass ``--blank`` to skip
+the second stage and only ever blank the screens.
+
+In either stage the cover grabs input, so the first key (the Shift key
+included), mouse click, or mouse move past a small threshold *minimizes* the
+cover — and, once the displays are off, wakes them — to make the desktop usable
+again. Press Esc to quit.
 
 Powering the displays off does not pause the machine: background applications
-keep running exactly as in blank mode. Only the monitors' power state changes.
+keep running exactly as in the blank stage. Only the monitors' power state
+changes.
 
 Only one instance runs at a time. Launching ScreenCover again (from the taskbar
 icon, the global shortcut, or the menu) re-covers the screens on the running
@@ -195,11 +199,17 @@ def get_monitors():
 
 
 class ScreenCover:
-    """Black, full-screen cover spanning all monitors.
+    """Black, full-screen cover spanning all monitors, in two stages.
 
     Behaves like a screen saver: user input minimizes the covers (letting the
     desktop and background apps be used), and the covers return once the whole
-    computer has been idle for ``idle_timeout_ms``. Esc quits.
+    computer has been idle for ``idle_timeout_ms``.
+
+    Covering happens in two stages. First the black overlay is shown with the
+    displays still on (the "blank" stage). Then, if nothing has dismissed the
+    cover for a further ``off_delay_ms``, the displays are powered off via DPMS
+    (the "off" stage). With ``screen_off=False`` the second stage is skipped and
+    the cover only ever blanks. Esc quits.
     """
 
     # Ignore input for this long after launch (and after each re-cover) so the
@@ -220,17 +230,28 @@ class ScreenCover:
     MOTION_THRESHOLD_PX = 30
 
     def __init__(
-        self, idle_timeout_ms=15 * 60 * 1000, ipc_sock=None, screen_off=True
+        self,
+        idle_timeout_ms=15 * 60 * 1000,
+        off_delay_ms=45 * 60 * 1000,
+        ipc_sock=None,
+        screen_off=True,
     ):
         self.idle_timeout_ms = idle_timeout_ms
+        # How long the cover stays merely blank before the displays are powered
+        # off. Measured from the moment the cover is shown; cancelled if the
+        # cover is dismissed first.
+        self.off_delay_ms = off_delay_ms
         self.ipc_sock = ipc_sock
         # When True (the default), power the displays off via DPMS once the
-        # cover has armed, on top of the black overlay. When False (--blank),
-        # only the black overlay is shown and the displays stay on.
+        # cover has been blank for off_delay_ms. When False (--blank), only the
+        # black overlay is ever shown and the displays stay on.
         self.screen_off = screen_off
         # Becomes True once we've found that the displays cannot be powered off
         # (xset missing or DPMS unavailable); we then behave like blank mode.
         self.dpms_unavailable = False
+        # Pending after() id for the blank -> off transition, so it can be
+        # cancelled when the cover is dismissed.
+        self._power_off_after = None
 
         self.root = tk.Tk()
         self.root.withdraw()  # The root stays hidden; covers are Toplevels.
@@ -299,6 +320,8 @@ class ScreenCover:
         _log("minimize")
         self.covered = False
         self.armed = False
+        # Dismissed before the blank -> off transition fired; cancel it.
+        self._cancel_power_off()
         try:
             self.windows[0].grab_release()
         except tk.TclError:
@@ -328,7 +351,8 @@ class ScreenCover:
             self.root.after(self.POLL_INTERVAL_MS, self._poll_idle)
 
     def cover(self):
-        """Re-show every cover, grab input, and re-arm after a short delay."""
+        """Re-show every cover (blank stage), grab input, re-arm, and schedule
+        the displays to power off after off_delay_ms."""
         if self.covered:
             return
         _log("cover")
@@ -342,6 +366,7 @@ class ScreenCover:
         if self.windows:
             self.windows[0].after(100, self._take_focus)
             self.windows[0].after(self.ARM_DELAY_MS, self._arm)
+            self._schedule_power_off()
 
     def _poll_ipc(self):
         """Re-cover if a relaunched instance signalled us, then reschedule."""
@@ -361,6 +386,7 @@ class ScreenCover:
         self.root.after(self.IPC_POLL_MS, self._poll_ipc)
 
     def quit(self, _event=None):
+        self._cancel_power_off()
         if self.ipc_sock is not None:
             try:
                 self.ipc_sock.close()
@@ -379,6 +405,9 @@ class ScreenCover:
             self.windows[0].after(100, self._take_focus)
             # Arm the input handlers only after the launch input has settled.
             self.windows[0].after(self.ARM_DELAY_MS, self._arm)
+            # Launching covers immediately (blank stage); the displays power off
+            # off_delay_ms later if the cover is not dismissed first.
+            self._schedule_power_off()
         if self.ipc_sock is not None:
             self.root.after(self.IPC_POLL_MS, self._poll_ipc)
         self.root.mainloop()
@@ -399,20 +428,35 @@ class ScreenCover:
         self._pointer_anchor = None
         self.armed = True
         _log("armed")
-        # Power the displays off only after the launch/re-cover input has
-        # settled. Doing it here (rather than the moment the cover is shown)
-        # avoids the launch keystroke or shortcut chord immediately waking the
-        # monitors back up. Any later input wakes them via the hardware, and the
-        # same event reaches the grabbing overlay and dismisses the cover.
-        self._power_off_displays()
+
+    def _schedule_power_off(self):
+        """Arm the blank -> off transition for off_delay_ms from now."""
+        self._cancel_power_off()
+        if not self.screen_off or self.dpms_unavailable:
+            return
+        self._power_off_after = self.root.after(
+            self.off_delay_ms, self._power_off_displays
+        )
+        _log("power-off scheduled in %s ms" % self.off_delay_ms)
+
+    def _cancel_power_off(self):
+        if self._power_off_after is not None:
+            try:
+                self.root.after_cancel(self._power_off_after)
+            except (tk.TclError, ValueError):
+                pass
+            self._power_off_after = None
 
     def _power_off_displays(self):
-        """Turn the monitors off via DPMS, if in --off mode and available.
+        """Turn the monitors off via DPMS (the off stage).
 
         Best effort: a missing ``xset`` or a server without DPMS just leaves the
-        black overlay up (i.e. degrades to blank mode) instead of failing.
+        black overlay up (i.e. degrades to blank mode) instead of failing. Any
+        later input wakes the displays via the hardware, and the same event
+        reaches the grabbing overlay and dismisses the cover.
         """
-        if not self.screen_off or self.dpms_unavailable:
+        self._power_off_after = None
+        if not self.covered or not self.screen_off or self.dpms_unavailable:
             return
         import subprocess
 
@@ -450,14 +494,22 @@ def main():
         type=float,
         default=15,
         metavar="MINUTES",
-        help="re-cover the screens after the computer is idle this many "
-        "minutes (default: 15)",
+        help="blank the screens (show the black cover) after the computer is "
+        "idle this many minutes (default: 15)",
+    )
+    parser.add_argument(
+        "--off-delay",
+        type=float,
+        default=45,
+        metavar="MINUTES",
+        help="power the displays off (via DPMS) this many minutes after the "
+        "screens blank (default: 45)",
     )
     parser.add_argument(
         "--blank",
         action="store_true",
-        help="keep the displays on under a solid black overlay instead of "
-        "powering them off (the default turns the displays off via DPMS)",
+        help="only ever blank the screens; never power the displays off (the "
+        "default powers them off via DPMS after --off-delay)",
     )
     parser.add_argument(
         "--debug",
@@ -482,6 +534,7 @@ def main():
 
     ScreenCover(
         idle_timeout_ms=int(args.idle_timeout * 60 * 1000),
+        off_delay_ms=int(args.off_delay * 60 * 1000),
         ipc_sock=server,
         screen_off=not args.blank,
     ).run()
