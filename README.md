@@ -86,6 +86,7 @@ python screencover.py --idle-timeout 0.1 --off-delay 0.1
 | `-i`, `--idle-timeout` | `MINUTES` | `15` | Blank the screens (show the black cover) after the computer has been idle this many minutes. |
 | `--off-delay` | `MINUTES` | `45` | Power the displays off (via DPMS) this many minutes after the screens blank. Ignored when `--blank` is set. |
 | `--blank` | — | off (powers off) | Only ever blank the screens; never power the displays off (skip the off stage). |
+| `--no-initial-cover` | — | off (covers on launch) | Do **not** cover the screens on launch; start minimized and only cover after the idle timeout. Meant for autostart on login so signing in does not blank the screen. |
 | `--debug` | — | off | Print diagnostic events (idle, motion, cover/minimize, power-off) to stderr. |
 | `-h`, `--help` | — | — | Show the help message and exit. |
 
@@ -101,6 +102,7 @@ python screencover.py --idle-timeout 10          # blank at 10 min, off at 55 mi
 python screencover.py --idle-timeout 5 --off-delay 30   # blank at 5 min, off at 35 min
 python screencover.py --blank                    # only ever blank; never power off
 python screencover.py --delay 5                  # cover 5 seconds after launch
+python screencover.py --no-initial-cover         # don't cover on launch; wait for idle (autostart)
 python screencover.py --idle-timeout 0.1 --off-delay 0.1 --debug   # fast test
 ```
 
@@ -121,6 +123,47 @@ launching. The desktop/taskbar starts apps without an interactive shell, so a
 bare `python3` there can resolve to a system Python without `tkinter` and crash
 instantly — the wrapper makes the GUI use the same interpreter as your terminal.
 `install.sh` warns at install time if that interpreter can't import `tkinter`.
+
+## Autostart on login (Zorin OS / GNOME)
+
+To have ScreenCover start automatically every time you log in — without
+forgetting to launch it — install a **login autostart entry**:
+
+```bash
+./install.sh --autostart
+```
+
+This writes `~/.config/autostart/screencover.desktop`, which GNOME/Zorin runs
+**after** you log in and your graphical session is up (so `DISPLAY` and
+`XAUTHORITY` are already set for you). The entry launches with
+**`--no-initial-cover`**, so **logging in does not blank your screen** — the app
+just runs quietly in the background and shows the first cover only after the
+normal idle timeout (15 minutes by default). Remove it again with
+`./install.sh --uninstall`.
+
+> **Why not `cron`?** ScreenCover is an X11 GUI app. A `cron @reboot` job runs
+> before your desktop session exists, with no `DISPLAY`/`XAUTHORITY` and a
+> minimal `PATH`, so tkinter fails to connect to a display. Autostart entries
+> fire *inside* your session, after X is up, which is exactly what a
+> login-launched GUI app needs.
+
+If you prefer to write the entry yourself instead of using `--autostart`, create
+`~/.config/autostart/screencover.desktop` with (use the absolute path to
+`run.sh`):
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=ScreenCover
+Exec=/absolute/path/to/ScreenCover/run.sh --no-initial-cover
+Terminal=false
+X-GNOME-Autostart-enabled=true
+```
+
+Note the difference from `--delay`: `--delay N` still covers the screen (just
+`N` seconds after launch), whereas `--no-initial-cover` never covers on launch
+and waits for the idle timeout — the right choice for autostart. You can combine
+it with the timing flags, e.g. `run.sh --no-initial-cover --idle-timeout 10`.
 
 ## Keyboard shortcuts
 
@@ -158,5 +201,6 @@ You can also run with a delay directly: `python screencover.py --delay 5`.
 ./uninstall.sh
 ```
 
-Removes the launcher and the global keyboard shortcut and refreshes the icon
-cache. (`./install.sh --uninstall` does the same.)
+Removes the launcher, the login autostart entry (if installed), and the global
+keyboard shortcut, and refreshes the icon cache. (`./install.sh --uninstall`
+does the same.)
