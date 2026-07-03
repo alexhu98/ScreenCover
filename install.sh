@@ -23,6 +23,13 @@ chmod +x "$RUN_PATH" "$APP_PATH" 2>/dev/null || true
 DEST_DIR="$HOME/.local/share/applications"
 DEST_FILE="$DEST_DIR/screencover.desktop"
 
+# Autostart entry (installed only with --autostart). GNOME/Zorin launches
+# everything here after login, once X is up, so DISPLAY/XAUTHORITY are already
+# set — unlike a cron @reboot job. It uses --no-initial-cover so logging in does
+# NOT blank the screen; the first cover waits for the normal idle timeout.
+AUTOSTART_DIR="$HOME/.config/autostart"
+AUTOSTART_FILE="$AUTOSTART_DIR/screencover.desktop"
+
 # Global keyboard shortcut (override with e.g. SHORTCUT='<Super>b' ./install.sh)
 SHORTCUT="${SHORTCUT:-<Control><Super><Alt>b}"
 # Delay (seconds) used by the launcher's "Cover after N seconds" action.
@@ -57,13 +64,43 @@ PY
     rm -f /tmp/.sc_kb_list
 }
 
-if [[ "${1:-}" == "--uninstall" ]]; then
-    rm -f "$DEST_FILE"
-    update-desktop-database "$DEST_DIR" 2>/dev/null || true
-    register_shortcut no
-    echo "Removed $DEST_FILE and the global shortcut."
-    exit 0
-fi
+# Write the login autostart entry (see AUTOSTART_FILE above).
+install_autostart() {
+    mkdir -p "$AUTOSTART_DIR"
+    cat > "$AUTOSTART_FILE" <<EOF
+[Desktop Entry]
+Type=Application
+Name=ScreenCover
+Comment=Start ScreenCover on login; blanks only after the idle timeout
+Exec=$RUN_PATH --no-initial-cover
+Icon=$icon
+Terminal=false
+Categories=Utility;
+X-GNOME-Autostart-enabled=true
+EOF
+    echo "Installed autostart entry: $AUTOSTART_FILE (starts minimized; blanks on idle)"
+}
+
+# Parse the single supported flag, if any.
+AUTOSTART=0
+case "${1:-}" in
+    --uninstall)
+        rm -f "$DEST_FILE" "$AUTOSTART_FILE"
+        update-desktop-database "$DEST_DIR" 2>/dev/null || true
+        register_shortcut no
+        echo "Removed $DEST_FILE, $AUTOSTART_FILE, and the global shortcut."
+        exit 0
+        ;;
+    --autostart)
+        AUTOSTART=1
+        ;;
+    "")
+        ;;
+    *)
+        echo "Unknown option: $1 (use --autostart or --uninstall)" >&2
+        exit 2
+        ;;
+esac
 
 mkdir -p "$DEST_DIR"
 
@@ -104,3 +141,8 @@ fi
 echo "Installed launcher: $DEST_FILE (delay action: ${DELAY}s)"
 echo "Launching via: $RUN_PATH (pyenv-aware)"
 echo "Open the Apps menu, search 'ScreenCover', right-click its icon -> 'Pin to Taskbar'."
+
+# Install the login autostart entry when requested (--autostart).
+if [[ "$AUTOSTART" == "1" ]]; then
+    install_autostart
+fi

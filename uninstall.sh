@@ -9,6 +9,7 @@ set -euo pipefail
 
 DEST_DIR="$HOME/.local/share/applications"
 DEST_FILE="$DEST_DIR/screencover.desktop"
+AUTOSTART_FILE="$HOME/.config/autostart/screencover.desktop"
 
 MK_SCHEMA="org.gnome.settings-daemon.plugins.media-keys"
 KB_PATH="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/screencover/"
@@ -21,6 +22,12 @@ else
     echo "No launcher found at $DEST_FILE"
 fi
 update-desktop-database "$DEST_DIR" 2>/dev/null || true
+
+# Remove the login autostart entry, if present.
+if [[ -f "$AUTOSTART_FILE" ]]; then
+    rm -f "$AUTOSTART_FILE"
+    echo "Removed autostart entry: $AUTOSTART_FILE"
+fi
 
 # Remove the global keyboard shortcut from the media-keys list.
 if command -v gsettings >/dev/null 2>&1; then

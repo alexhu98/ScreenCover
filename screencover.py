@@ -235,6 +235,7 @@ class ScreenCover:
         off_delay_ms=45 * 60 * 1000,
         ipc_sock=None,
         screen_off=True,
+        start_minimized=False,
     ):
         self.idle_timeout_ms = idle_timeout_ms
         # How long the cover stays merely blank before the displays are powered
@@ -257,7 +258,11 @@ class ScreenCover:
         self.root.withdraw()  # The root stays hidden; covers are Toplevels.
 
         self.armed = False
-        self.covered = True
+        # Normally launching covers immediately (the "cover now" gesture). With
+        # start_minimized (--no-initial-cover) we begin out of the way instead,
+        # so an autostart/login launch does not blank the screen; the first
+        # cover then appears only after the usual idle timeout.
+        self.covered = not start_minimized
         self.idle_unavailable = False  # True once we've given up on idle polls.
         # Baseline pointer position, set from the first motion event after the
         # cover arms; motion past the threshold from here minimizes. Reset to
@@ -266,6 +271,15 @@ class ScreenCover:
         self.windows = []
         for x, y, width, height in get_monitors():
             self.windows.append(self._make_cover(x, y, width, height))
+
+        if not self.covered:
+            # Toplevels are mapped on creation; hide them so a login/autostart
+            # launch stays invisible until _poll_idle brings the cover up.
+            for win in self.windows:
+                try:
+                    win.withdraw()
+                except tk.TclError:
+                    pass
 
     def _make_cover(self, x, y, width, height):
         win = tk.Toplevel(self.root)
@@ -398,7 +412,7 @@ class ScreenCover:
             pass
 
     def run(self):
-        if self.windows:
+        if self.windows and self.covered:
             # Grab all keyboard + pointer input. Borderless (override-redirect)
             # windows are not given keyboard focus by the window manager, so
             # without a grab only mouse clicks arrive and key presses are lost.
@@ -408,6 +422,10 @@ class ScreenCover:
             # Launching covers immediately (blank stage); the displays power off
             # off_delay_ms later if the cover is not dismissed first.
             self._schedule_power_off()
+        elif self.windows and not self.idle_unavailable:
+            # --no-initial-cover: stay minimized and poll for idle, exactly as
+            # after a dismiss, so the first cover waits for the idle timeout.
+            self.root.after(self.POLL_INTERVAL_MS, self._poll_idle)
         if self.ipc_sock is not None:
             self.root.after(self.IPC_POLL_MS, self._poll_ipc)
         self.root.mainloop()
@@ -512,6 +530,13 @@ def main():
         "default powers them off via DPMS after --off-delay)",
     )
     parser.add_argument(
+        "--no-initial-cover",
+        action="store_true",
+        help="do not cover the screens on launch; start minimized and only "
+        "cover after the idle timeout (handy for autostart on login so the "
+        "screen is not blanked immediately)",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="print diagnostic events (idle, motion, cover/minimize) to stderr",
@@ -537,6 +562,7 @@ def main():
         off_delay_ms=int(args.off_delay * 60 * 1000),
         ipc_sock=server,
         screen_off=not args.blank,
+        start_minimized=args.no_initial_cover,
     ).run()
 
 
